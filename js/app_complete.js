@@ -1348,19 +1348,16 @@
     const seriesOrder = parseInt(dom.seriesOrder ? dom.seriesOrder.value : 5);
     const target = dom.solveTarget ? dom.solveTarget.value : '0';
 
-    // 尝试后端 API
+    // 尝试后端 API（直接调用，不预先检查健康状态）
     let backendResult = null;
-    const hasBackend = await checkBackend();
-    if (hasBackend) {
-      try {
-        backendResult = await tryBackendCompute(raw, currentMode, {
-          order, lower: type === 'definite' ? lower : null,
-          upper: type === 'definite' ? upper : null,
-          point, direction, seriesOrder, target
-        });
-      } catch (e) {
-        console.warn('Backend computation failed:', e);
-      }
+    try {
+      backendResult = await tryBackendCompute(raw, currentMode, {
+        order, lower: type === 'definite' ? lower : null,
+        upper: type === 'definite' ? upper : null,
+        point, direction, seriesOrder, target
+      });
+    } catch (e) {
+      console.warn('Backend computation failed:', e);
     }
 
     if (backendResult) {
