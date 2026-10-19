@@ -402,17 +402,14 @@
 
   // ========== SymPy 后端 API ==========
   const BACKEND_URL = 'https://divine-radiance-production-c1b9.up.railway.app';
-  let backendAvailable = null;
 
   async function checkBackend() {
-    if (backendAvailable !== null) return backendAvailable;
     try {
       const resp = await fetch(BACKEND_URL + '/api/health', { signal: AbortSignal.timeout(15000) });
-      backendAvailable = resp.ok;
+      return resp.ok;
     } catch (e) {
-      backendAvailable = false;
+      return false;
     }
-    return backendAvailable;
   }
 
   function prepareExprForBackend(raw) {
