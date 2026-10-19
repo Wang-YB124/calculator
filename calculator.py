@@ -184,14 +184,25 @@ def _smart_simplify(expr):
             pass
 
     # 选择 LaTeX 最短的（通常最简洁）
+    # 如果长度相近（差距<15%），优先选择展开形式（更易读）
     best = expr
     best_len = len(_safe_latex(expr))
+    best_is_expanded = False
+    
     for c in candidates:
         try:
             l = len(_safe_latex(c))
-            if l < best_len:
+            c_is_expanded = c.is_Add and len(c.args) > 2  # 多项和式
+            
+            # 如果更短，或者长度相近但是展开形式
+            if l < best_len * 0.95:  # 明显更短
                 best = c
                 best_len = l
+                best_is_expanded = c_is_expanded
+            elif l < best_len * 1.15 and c_is_expanded and not best_is_expanded:  # 长度相近但展开形式
+                best = c
+                best_len = l
+                best_is_expanded = c_is_expanded
         except Exception:
             pass
     
@@ -450,7 +461,6 @@ def _build_indefinite_result(result, steps, expr, var, var_name, method=""):
     except Exception:
         pass
 
-    steps.append(f"最终结果: ${latex_result} + C$")
     steps.append("其中 C 为任意常数")
 
     return {
@@ -464,34 +474,119 @@ def _build_indefinite_result(result, steps, expr, var, var_name, method=""):
 
 def _generate_detailed_integration_steps(steps, expr, result, var, var_name):
     """根据表达式类型生成详细的积分步骤"""
-    # 如果是加法，逐项积分
-    if expr.is_Add:
-        terms = expr.as_ordered_terms()
-        steps.append("应用加法法则：逐项分别积分")
-        steps.append(f"$\\int ({_safe_latex(expr)}) \\, d{var_name} = " +
-                     " + ".join([f"\\int {_safe_latex(t)} \\, d{var_name}" for t in terms]) + "$")
-
-        # 对每一项显示积分过程
-        for term in terms:
-            _integrate_single_term(steps, term, var, var_name)
-
-        steps.append("合并结果:")
-        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
-
-    # 如果是单项式，直接应用公式
-    elif expr.is_Mul or expr.is_Pow or expr.is_Symbol or expr.is_Number:
-        _integrate_single_term(steps, expr, var, var_name)
-        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
-
-    # 如果是函数，显示对应的积分公式
+    # 检测是否需要分部积分
+    needs_by_parts = _should_use_integration_by_parts(expr, var)
+    
+    if needs_by_parts:
+        # 分部积分
+        _show_integration_by_parts_steps(steps, expr, result, var, var_name)
+    elif expr.is_Add:
+        # 加法：逐项积分
+        _show_sum_integration_steps(steps, expr, result, var, var_name)
     elif expr.is_Function:
-        func_name = type(expr).__name__
-        _show_function_integration_rule(steps, func_name, expr, result, var, var_name)
-        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
-
+        # 基本函数
+        _show_basic_function_steps(steps, expr, result, var, var_name)
     else:
-        steps.append("应用积分公式和积分法则")
-        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+        # 其他情况：尝试换元法
+        _show_substitution_steps(steps, expr, result, var, var_name)
+
+
+def _show_integration_by_parts_steps(steps, expr, result, var, var_name):
+    """显示分部积分步骤"""
+    # 使用 LIATE 规则选择 u 和 dv
+    u, dv = _choose_u_dv_by_liate(expr, var)
+    
+    if u is None or dv is None:
+        # 无法确定，使用默认方法
+        steps.append("使用分部积分法")
+        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name}$")
+        steps.append(f"结果: $= {_safe_latex(result)} + C$")
+        return
+    
+    # 计算 du 和 v
+    du = diff(u, var)
+    v = integrate(dv, var)
+    
+    steps.append("使用分部积分法：$\\int u \\, dv = uv - \\int v \\, du$")
+    steps.append(f"设 $u = {_safe_latex(u)}$，$dv = {_safe_latex(dv)} \\, d{var_name}$")
+    steps.append(f"则 $du = {_safe_latex(du)} \\, d{var_name}$，$v = {_safe_latex(v)}$")
+    steps.append(f"代入公式：$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(u)} \\cdot {_safe_latex(v)} - \\int {_safe_latex(v)} \\cdot {_safe_latex(du)} \\, d{var_name}$")
+    
+    # 计算剩余积分
+    remaining = integrate(v * du, var)
+    if not remaining.has(Integral):
+        steps.append(f"计算剩余积分：$\\int {_safe_latex(v)} \\cdot {_safe_latex(du)} \\, d{var_name} = {_safe_latex(_smart_simplify(remaining))}$")
+        final_result = _smart_simplify(u * v - remaining)
+        steps.append(f"最终结果：$= {_safe_latex(final_result)} + C$")
+    else:
+        steps.append(f"最终结果：$= {_safe_latex(result)} + C$")
+
+
+def _choose_u_dv_by_liate(expr, var):
+    """使用 LIATE 规则选择 u 和 dv"""
+    # 处理乘积形式
+    if expr.is_Mul:
+        factors = expr.as_ordered_factors()
+        
+        # 检查是否有对数或反三角函数
+        for factor in factors:
+            if factor.has(log, asin, acos, atan):
+                return factor, expr / factor
+        
+        # 检查是否有代数函数 × 三角/指数函数
+        has_poly = any(f.is_polynomial(var) for f in factors)
+        has_trig_exp = any(f.has(sin, cos, tan, exp) for f in factors)
+        
+        if has_poly and has_trig_exp:
+            for f in factors:
+                if f.is_polynomial(var):
+                    return expr / f, f  # u = 非多项式部分，dv = 多项式部分
+    
+    # 处理复合函数：ln(多项式)、反三角函数(多项式)
+    if expr.is_Function and expr.has(log, asin, acos, atan):
+        # u = 整个函数，dv = dx (即 1)
+        return expr, sp.Integer(1)
+    
+    return None, None
+
+
+def _show_sum_integration_steps(steps, expr, result, var, var_name):
+    """显示求和积分步骤"""
+    terms = expr.as_ordered_terms()
+    steps.append("应用加法法则：逐项分别积分")
+    steps.append(f"$\\int ({_safe_latex(expr)}) \\, d{var_name} = " +
+                 " + ".join([f"\\int {_safe_latex(t)} \\, d{var_name}" for t in terms]) + "$")
+    
+    for term in terms:
+        _integrate_single_term(steps, term, var, var_name)
+    
+    steps.append(f"合并结果：$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+
+def _show_basic_function_steps(steps, expr, result, var, var_name):
+    """显示基本函数积分步骤"""
+    func_name = type(expr).__name__
+    _show_function_integration_rule(steps, func_name, expr, result, var, var_name)
+    steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+
+def _show_substitution_steps(steps, expr, result, var, var_name):
+    """显示换元法步骤"""
+    # 尝试识别合适的换元
+    if expr.is_Function:
+        inner = expr.args[0] if expr.args else None
+        if inner is not None and inner.has(var):
+            steps.append("使用换元法")
+            steps.append(f"设 $u = {_safe_latex(inner)}$")
+            du = diff(inner, var)
+            steps.append(f"则 $du = {_safe_latex(du)} \\, d{var_name}$")
+            steps.append(f"原积分变为：$\\int {_safe_latex(expr.func)}(u) \\cdot \\frac{{1}}{{{_safe_latex(du)}}} \\, du$")
+            steps.append(f"计算得：$= {_safe_latex(result)} + C$")
+            return
+    
+    # 无法识别换元，直接显示结果
+    steps.append("应用积分公式和积分法则")
+    steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
 
 
 def _integrate_single_term(steps, term, var, var_name):
@@ -643,20 +738,27 @@ def _build_trigsimp_steps(result, steps, expr, trig_simplified, var, var_name):
 
 def _should_use_integration_by_parts(expr, var):
     """判断是否应该展示分部积分步骤"""
-    if not expr.is_Mul:
-        return False
+    # 检查是否是乘积形式
+    if expr.is_Mul:
+        factors = expr.as_ordered_factors()
 
-    factors = expr.as_ordered_factors()
+        # 检查是否包含对数、反三角函数
+        if any(f.has(log, asin, acos, atan) for f in factors):
+            return True
 
-    # 检查是否包含对数、反三角函数
-    if any(f.has(log, asin, acos, atan) for f in factors):
-        return True
+        # 检查是否是多项式 × 三角/指数
+        has_poly = any(f.is_polynomial(var) for f in factors)
+        has_trig_exp = any(f.has(sin, cos, tan, exp) for f in factors)
+        if has_poly and has_trig_exp:
+            return True
 
-    # 检查是否是多项式 × 三角/指数
-    has_poly = any(f.is_polynomial(var) for f in factors)
-    has_trig_exp = any(f.has(sin, cos, tan, exp) for f in factors)
-    if has_poly and has_trig_exp:
-        return True
+    # 检查是否是复合函数：ln(多项式)、反三角函数(多项式)等
+    if expr.is_Function:
+        if expr.has(log, asin, acos, atan):
+            # 检查参数是否不是简单的 x
+            arg = expr.args[0] if expr.args else None
+            if arg is not None and arg != var and arg.has(var):
+                return True
 
     return False
 
