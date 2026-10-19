@@ -432,6 +432,177 @@
     }
   }
 
+  function parseBackendSteps(backendResult, mode, opts) {
+    const rawSteps = backendResult.steps || [];
+    const formatted = [];
+
+    const extractLatex = (s) => {
+      const m = s.match(/\$([^$]+)\$/);
+      return m ? m[1] : null;
+    };
+    const stripLatex = (s) => s.replace(/\$[^$]*\$/g, '').trim();
+
+    for (let i = 0; i < rawSteps.length; i++) {
+      const s = rawSteps[i];
+      if (!s || typeof s !== 'string') continue;
+
+      const latex = extractLatex(s);
+      const text = stripLatex(s);
+
+      if (/^原函数/.test(text)) {
+        formatted.push({
+          desc: '原始函数',
+          explanation: '需要处理的函数',
+          latex: latex || `f(x) = ${toLatex(opts.expr)}`
+        });
+      } else if (/^计算(不定|定)?积分/.test(text)) {
+        formatted.push({
+          desc: '设置积分',
+          explanation: text.replace(/^计算/, ''),
+          latex: latex
+        });
+      } else if (/^结果/.test(text)) {
+        formatted.push({
+          desc: '最终结果',
+          explanation: '',
+          latex: latex || backendResult.resultLatex
+        });
+      } else if (/^方法[：:]/.test(text)) {
+        const method = text.replace(/^方法[：:]\s*/, '');
+        formatted.push({
+          desc: '计算方法',
+          explanation: method,
+          latex: null
+        });
+      } else if (/^数值/.test(text)) {
+        formatted.push({
+          desc: '数值验证',
+          explanation: '',
+          latex: latex
+        });
+      } else if (/^各阶导数/.test(text)) {
+        formatted.push({
+          desc: '计算各阶导数',
+          explanation: '在展开点求值，计算泰勒系数',
+          latex: null
+        });
+      } else if (/^求解方程/.test(text)) {
+        formatted.push({
+          desc: '建立方程',
+          explanation: '令 f(x) = 0',
+          latex: latex
+        });
+      } else if (/^解[：:]/.test(text)) {
+        formatted.push({
+          desc: '方程的解',
+          explanation: '',
+          latex: latex
+        });
+      } else if (/^对.*求.*导数/.test(text)) {
+        formatted.push({
+          desc: '求导',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^(应用|使用|利用)/.test(text)) {
+        formatted.push({
+          desc: '应用法则',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^(多项式|三角|负幂|底数|加法|含|有理)/.test(text) || /→/.test(text)) {
+        formatted.push({
+          desc: '分析结构',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^(被积函数|先|将)/.test(text)) {
+        formatted.push({
+          desc: '变换处理',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^SymPy 无法/.test(text) || /^建议/.test(text)) {
+        formatted.push({
+          desc: '提示',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^类型/.test(text)) {
+        formatted.push({
+          desc: '判断类型',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^分子求导|^分母求导/.test(text)) {
+        formatted.push({
+          desc: text.replace(/[：:].*$/, ''),
+          explanation: '',
+          latex: latex
+        });
+      } else if (/^在.*展开/.test(text)) {
+        formatted.push({
+          desc: '展开点',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^展开到/.test(text)) {
+        formatted.push({
+          desc: '展开阶数',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^直接代入/.test(text)) {
+        formatted.push({
+          desc: '代入检验',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^原函数[：:]/.test(text) && latex) {
+        formatted.push({
+          desc: '求原函数',
+          explanation: '不定积分的结果 F(x)',
+          latex: latex
+        });
+      } else if (latex) {
+        const cleanText = text.replace(/^[：:]\s*/, '').trim();
+        formatted.push({
+          desc: cleanText || '中间结果',
+          explanation: '',
+          latex: latex
+        });
+      } else if (text.length > 0) {
+        formatted.push({
+          desc: text,
+          explanation: '',
+          latex: null
+        });
+      }
+    }
+
+    if (formatted.length === 0) {
+      formatted.push({
+        desc: '原始函数',
+        explanation: '需要处理的函数',
+        latex: `f(x) = ${toLatex(opts.expr)}`
+      });
+      const modeDesc = {
+        derivative: `使用 SymPy 计算${opts.order || 1}阶导数`,
+        integral: '使用 SymPy 计算积分',
+        limit: '使用 SymPy 计算极限',
+        series: '使用 SymPy 计算泰勒级数',
+        solve: '使用 SymPy 求解方程'
+      };
+      formatted.push({
+        desc: modeDesc[mode] || '计算',
+        explanation: '后端符号计算引擎给出精确结果',
+        latex: backendResult.resultLatex
+      });
+    }
+
+    return formatted;
+  }
+
   async function tryBackendCompute(raw, mode, options) {
     const expr = prepareExprForBackend(raw);
     let result = null;
@@ -1190,62 +1361,9 @@
     }
 
     if (backendResult) {
-      // 使用后端结果
-      const steps = backendResult.steps.map(s => ({
-        desc: s.replace(/\$[^$]*\$/g, '').trim(),
-        explanation: '',
-        latex: s.includes('$') ? s.replace(/^\S+\s*/, '').replace(/\$/g, '') : s
-      }));
-
-      // 构建步骤（更友好的格式）
-      const formattedSteps = [];
-      formattedSteps.push({
-        desc: '原始函数',
-        explanation: '这是我们需要处理的函数 f(x)',
-        latex: `f(x) = ${toLatex(expr)}`
+      const formattedSteps = parseBackendSteps(backendResult, currentMode, {
+        expr, order, type, lower, upper, point, direction, seriesOrder, target
       });
-
-      if (currentMode === 'derivative') {
-        const dNotation = order === 1 ? "f'(x)" : order === 2 ? "f''(x)" : `f^{(${order})}(x)`;
-        formattedSteps.push({
-          desc: `使用 SymPy 计算${order}阶导数`,
-          explanation: '后端符号计算引擎给出精确结果',
-          latex: `${dNotation} = ${backendResult.resultLatex}`
-        });
-      } else if (currentMode === 'integral') {
-        if (type === 'definite' && lower && upper) {
-          formattedSteps.push({
-            desc: '使用 SymPy 计算定积分',
-            explanation: `从 ${lower} 到 ${upper}`,
-            latex: `\\int_{${lower}}^{${upper}} f(x)dx = ${backendResult.resultLatex}`
-          });
-        } else {
-          formattedSteps.push({
-            desc: '使用 SymPy 计算不定积分',
-            explanation: '后端符号计算引擎给出精确结果',
-            latex: `\\int f(x)dx = ${backendResult.resultLatex}`
-          });
-        }
-      } else if (currentMode === 'limit') {
-        const dirStr = direction === 'left' ? '^-' : direction === 'right' ? '^+' : '';
-        formattedSteps.push({
-          desc: '使用 SymPy 计算极限',
-          explanation: `当 x 趋向于 ${point}`,
-          latex: `\\lim_{x \\to ${point}${dirStr}} f(x) = ${backendResult.resultLatex}`
-        });
-      } else if (currentMode === 'series') {
-        formattedSteps.push({
-          desc: '使用 SymPy 计算泰勒级数',
-          explanation: `在 x = ${point} 处展开到 ${seriesOrder} 阶`,
-          latex: `f(x) \\approx ${backendResult.resultLatex} + \\cdots`
-        });
-      } else if (currentMode === 'solve') {
-        formattedSteps.push({
-          desc: '使用 SymPy 求解方程',
-          explanation: `求解 f(x) = ${target}`,
-          latex: backendResult.resultLatex
-        });
-      }
 
       lastResult = {
         expr,
@@ -1256,7 +1374,8 @@
         steps: formattedSteps,
         definiteValue: backendResult.numerical,
         solutions: backendResult.solutions,
-        seriesCoefficients: backendResult.terms
+        seriesCoefficients: backendResult.terms,
+        graphExpr: backendResult.expression
       };
 
       if (dom.resultsSection) {
@@ -1338,9 +1457,9 @@
     // 获取结果函数的表达式
     let resultExpr = null;
     if (lastResult.mode === 'derivative') {
-      resultExpr = lastResult.result;
+      resultExpr = lastResult.graphExpr || (lastResult.isBackendLatex ? null : lastResult.result);
     } else if (lastResult.mode === 'integral') {
-      resultExpr = lastResult.result;
+      resultExpr = lastResult.graphExpr || (lastResult.isBackendLatex ? null : lastResult.result);
     }
     
     // 预编译计算函数（避免每次采样都重新创建）
