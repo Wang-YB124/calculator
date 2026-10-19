@@ -88,10 +88,13 @@
     // 处理平方根
     result = result.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
     
-    // 处理三角函数和常用函数
+    // 处理三角函数和常用函数（反三角必须在三角函数之前处理）
     result = result.replace(/arcsin\(/g, '\\arcsin(');
     result = result.replace(/arccos\(/g, '\\arccos(');
     result = result.replace(/arctan\(/g, '\\arctan(');
+    result = result.replace(/asin\(/g, '\\arcsin(');
+    result = result.replace(/acos\(/g, '\\arccos(');
+    result = result.replace(/atan\(/g, '\\arctan(');
     result = result.replace(/sin\(/g, '\\sin(');
     result = result.replace(/cos\(/g, '\\cos(');
     result = result.replace(/tan\(/g, '\\tan(');
