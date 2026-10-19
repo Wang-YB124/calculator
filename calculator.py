@@ -68,26 +68,6 @@ def _preprocess(expr_str):
     s = re.sub(r'(?<![a-zA-Z])e(?![a-zA-Z(])', 'E', s)
 
     # 处理 f^n(x) 形式: sin^2(x) -> sin(x)**2
-    s = re.sub(r'\b(\w+)\s*\*\*\s*(\d+)\s*\(', r'\1(\2,', s)
-    # 上面的替换把 sin**2(x) 变成了 sin(2,x)，需要修复
-    # 实际上这个模式不太对，换个方式
-    # 重新来：先还原
-    s = str(expr_str).strip()
-    s = s.replace('π', 'pi').replace('∞', 'oo')
-    s = s.replace('^', '**')
-
-    # 更稳健的 f^n(x) -> (f(x))^n
-    def replace_power_func(m):
-        func = m.group(1)
-        power = m.group(2)
-        return f'({func}('  # 占位，后面处理
-    # 简单处理常见的
-    for func in ['sin', 'cos', 'tan', 'asin', 'acos', 'atan',
-                 'sinh', 'cosh', 'tanh', 'log', 'exp', 'sqrt', 'Abs']:
-        pattern = rf'\b{func}\s*\*\*\s*(\d+)\s*\('
-        s = re.sub(pattern, f'{func}(', s)
-        # 注意：这里不直接加 **n，因为不知道括号范围
-        # 让用户用 sin(x)**2 的写法更可靠
 
     # 隐式乘法: 2x -> 2*x, xy -> x*y (由 parse_expr 的 transformations 处理)
 
