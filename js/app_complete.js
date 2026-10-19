@@ -401,7 +401,7 @@
   async function checkBackend() {
     if (backendAvailable !== null) return backendAvailable;
     try {
-      const resp = await fetch(BACKEND_URL + '/api/health', { signal: AbortSignal.timeout(2000) });
+      const resp = await fetch(BACKEND_URL + '/api/health', { signal: AbortSignal.timeout(10000) });
       backendAvailable = resp.ok;
     } catch (e) {
       backendAvailable = false;
@@ -423,7 +423,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-        signal: AbortSignal.timeout(15000)
+        signal: AbortSignal.timeout(30000)
       });
       return await resp.json();
     } catch (e) {
