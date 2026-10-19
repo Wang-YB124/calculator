@@ -567,6 +567,36 @@
           explanation: '不定积分的结果 F(x)',
           latex: latex
         });
+      } else if (/^其中/.test(text)) {
+        formatted.push({
+          desc: '参数说明',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^合并 | 最终/.test(text)) {
+        formatted.push({
+          desc: text.replace(/[：:].*$/, ''),
+          explanation: '',
+          latex: latex
+        });
+      } else if (/^验证/.test(text)) {
+        formatted.push({
+          desc: '验证结果',
+          explanation: text,
+          latex: null
+        });
+      } else if (/^提取常数/.test(text)) {
+        formatted.push({
+          desc: '提取常数',
+          explanation: '',
+          latex: latex
+        });
+      } else if (/^应用幂函数 | 应用积分公式/.test(text)) {
+        formatted.push({
+          desc: '应用公式',
+          explanation: text,
+          latex: null
+        });
       } else if (latex) {
         const cleanText = text.replace(/^[：:]\s*/, '').trim();
         formatted.push({
