@@ -1,5 +1,4 @@
 flask==3.0.0
 flask-cors==4.0.0
 sympy==1.12
-numpy==1.26.2
 gunicorn==21.2.0
