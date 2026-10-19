@@ -21,6 +21,21 @@ from sympy.parsing.sympy_parser import (
 )
 import re
 import math
+from concurrent.futures import ProcessPoolExecutor, TimeoutError as FuturesTimeoutError
+
+
+# ─── 超时控制 ────────────────────────────────────────────────
+
+def _timeout_call(func, args=(), kwargs={}, timeout=15):
+    """带超时的函数调用"""
+    try:
+        with ProcessPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(func, *args, **kwargs)
+            return future.result(timeout=timeout)
+    except FuturesTimeoutError:
+        return None
+    except Exception:
+        return None
 
 
 # ─── 表达式解析 ───────────────────────────────────────────────
@@ -317,10 +332,10 @@ def _compute_indefinite_integral(expr, var, var_name):
     steps = []
     steps.append(f"计算不定积分: $\\int {_safe_latex(expr)} \\, d{var_name}$")
 
-    # 策略 1: 直接积分
-    result = integrate(expr, var)
+    # 策略 1: 直接积分（带超时）
+    result = _timeout_call(integrate, args=(expr, var), timeout=20)
 
-    if not result.has(Integral):
+    if result is not None and not result.has(Integral):
         result_simplified = _smart_simplify(result)
         return _build_indefinite_result(result_simplified, steps, expr, var, var_name, method="直接积分")
 
@@ -328,8 +343,8 @@ def _compute_indefinite_integral(expr, var, var_name):
     try:
         expanded = expand(expr)
         if expanded != expr:
-            result2 = integrate(expanded, var)
-            if not result2.has(Integral):
+            result2 = _timeout_call(integrate, args=(expanded, var), timeout=20)
+            if result2 is not None and not result2.has(Integral):
                 result_simplified = _smart_simplify(result2)
                 return _build_expansion_steps(result_simplified, steps, expr, expanded, var, var_name)
     except Exception:
@@ -339,8 +354,8 @@ def _compute_indefinite_integral(expr, var, var_name):
     try:
         trig_simplified = trigsimp(expr)
         if trig_simplified != expr:
-            result3 = integrate(trig_simplified, var)
-            if not result3.has(Integral):
+            result3 = _timeout_call(integrate, args=(trig_simplified, var), timeout=20)
+            if result3 is not None and not result3.has(Integral):
                 result_simplified = _smart_simplify(result3)
                 return _build_trigsimp_steps(result_simplified, steps, expr, trig_simplified, var, var_name)
     except Exception:
@@ -353,21 +368,22 @@ def _compute_indefinite_integral(expr, var, var_name):
 
     # 策略 5: 换元法尝试 (heurisch)
     try:
-        result4 = heurisch(expr, var)
+        result4 = _timeout_call(heurisch, args=(expr, var), timeout=20)
         if result4 is not None and not result4.has(Integral):
             result_simplified = _smart_simplify(result4)
             return _build_substitution_steps(result_simplified, steps, expr, var, var_name)
     except Exception:
         pass
 
-    # 策略 6: 分部积分提示 + 数值建议
-    steps.append("SymPy 无法求出该积分的初等原函数")
+    # 策略 6: 数值积分后备
+    steps.append("SymPy 无法在合理时间内求出该积分的初等原函数")
+    steps.append("建议：")
     _suggest_technique(steps, expr, var)
-    steps.append("建议：如果是定积分，可尝试数值积分方法")
+    steps.append("如果是定积分，可尝试数值积分方法")
 
     return {
         'success': False,
-        'error': '该积分无初等原函数（或 SymPy 无法求出）',
+        'error': '该积分计算超时或无初等原函数',
         'latex': None, 'steps': steps,
         'definite': False,
         'suggestion': _get_technique_suggestion(expr, var)
@@ -627,16 +643,16 @@ def _compute_definite_integral(expr, var, var_name, lower, upper):
 
     # 策略 1: 直接定积分
     try:
-        result = integrate(expr, (var, lower_sym, upper_sym))
-        if not result.has(Integral):
+        result = _timeout_call(integrate, args=(expr, (var, lower_sym, upper_sym)), timeout=20)
+        if result is not None and not result.has(Integral):
             return _build_definite_result(result, steps, expr, var, var_name, lower_sym, upper_sym, method="牛顿-莱布尼茨公式")
     except Exception:
         pass
 
     # 策略 2: 先求不定积分再代入
     try:
-        antideriv = integrate(expr, var)
-        if not antideriv.has(Integral):
+        antideriv = _timeout_call(integrate, args=(expr, var), timeout=20)
+        if antideriv is not None and not antideriv.has(Integral):
             antideriv_simplified = _smart_simplify(antideriv)
             val_upper = antideriv.subs(var, upper_sym)
             val_lower = antideriv.subs(var, lower_sym)
@@ -651,8 +667,8 @@ def _compute_definite_integral(expr, var, var_name, lower, upper):
     # 策略 3: 展开后积分
     try:
         expanded = expand(expr)
-        result3 = integrate(expanded, (var, lower_sym, upper_sym))
-        if not result3.has(Integral):
+        result3 = _timeout_call(integrate, args=(expanded, (var, lower_sym, upper_sym)), timeout=20)
+        if result3 is not None and not result3.has(Integral):
             steps.append("展开被积函数后逐项积分")
             return _build_definite_result(result3, steps, expr, var, var_name, lower_sym, upper_sym, method="展开后积分")
     except Exception:
