@@ -332,11 +332,19 @@ def _compute_indefinite_integral(expr, var, var_name):
     steps = []
     steps.append(f"计算不定积分: $\\int {_safe_latex(expr)} \\, d{var_name}$")
 
+    # 检测是否适合分部积分（多项式 × 三角/指数/对数）
+    should_show_by_parts = _should_use_integration_by_parts(expr, var)
+
     # 策略 1: 直接积分（带超时）
     result = _timeout_call(integrate, args=(expr, var), timeout=20)
 
     if result is not None and not result.has(Integral):
         result_simplified = _smart_simplify(result)
+        # 如果需要展示分部积分步骤，强制使用分部积分法
+        if should_show_by_parts:
+            by_parts_result = _try_integration_by_parts(expr, var, var_name, [])
+            if by_parts_result:
+                return by_parts_result
         return _build_indefinite_result(result_simplified, steps, expr, var, var_name, method="直接积分")
 
     # 策略 2: 展开后逐项积分
@@ -600,6 +608,26 @@ def _build_trigsimp_steps(result, steps, expr, trig_simplified, var, var_name):
     }
 
 
+def _should_use_integration_by_parts(expr, var):
+    """判断是否应该展示分部积分步骤"""
+    if not expr.is_Mul:
+        return False
+
+    factors = expr.as_ordered_factors()
+
+    # 检查是否包含对数、反三角函数
+    if any(f.has(log, asin, acos, atan) for f in factors):
+        return True
+
+    # 检查是否是多项式 × 三角/指数
+    has_poly = any(f.is_polynomial(var) for f in factors)
+    has_trig_exp = any(f.has(sin, cos, tan, exp) for f in factors)
+    if has_poly and has_trig_exp:
+        return True
+
+    return False
+
+
 def _try_integration_by_parts(expr, var, var_name, steps):
     """尝试分部积分法"""
     # 检测是否适合分部积分
@@ -608,25 +636,26 @@ def _try_integration_by_parts(expr, var, var_name, steps):
 
     factors = expr.as_ordered_factors()
 
-    # 寻找对数、反三角函数作为 u
+    # LIATE 规则选择 u: 对数 > 反三角 > 代数 > 三角 > 指数
     u_candidate = None
     dv_candidate = None
 
+    # 优先级 1: 对数或反三角函数作为 u
     for factor in factors:
         if factor.has(log, asin, acos, atan):
             u_candidate = factor
             dv_candidate = expr / factor
             break
 
+    # 优先级 2: 多项式 × 三角/指数 → 多项式作为 u
     if u_candidate is None:
-        # 检查多项式 * 三角/指数
         has_poly = any(f.is_polynomial(var) for f in factors)
         has_trig_exp = any(f.has(sin, cos, tan, exp) for f in factors)
         if has_poly and has_trig_exp:
             for f in factors:
                 if f.is_polynomial(var):
-                    dv_candidate = f
-                    u_candidate = expr / f
+                    u_candidate = f
+                    dv_candidate = expr / f
                     break
 
     if u_candidate is None:
