@@ -147,13 +147,36 @@ def _safe_latex(expr):
 
 def _smart_simplify(expr):
     """智能化简：尝试多种方法，返回最简洁的结果"""
+    from sympy import collect, combsimp
+    
     candidates = [expr]
 
-    methods = [
+    # 单次化简方法
+    single_methods = [
         simplify, trigsimp, powsimp, radsimp,
         together, expand, factor, cancel, ratsimp,
+        nsimplify, combsimp
     ]
-    for method in methods:
+    
+    for method in single_methods:
+        try:
+            result = method(expr)
+            candidates.append(result)
+        except Exception:
+            pass
+    
+    # 链式化简：先展开再收集/因式分解
+    chain_methods = [
+        lambda e: collect(expand(e)),
+        lambda e: factor(expand(e)),
+        lambda e: simplify(expand(e)),
+        lambda e: trigsimp(expand(e)),
+        lambda e: expand(trigsimp(e)),
+        lambda e: simplify(together(e)),
+        lambda e: together(simplify(e)),
+    ]
+    
+    for method in chain_methods:
         try:
             result = method(expr)
             candidates.append(result)
@@ -171,6 +194,16 @@ def _smart_simplify(expr):
                 best_len = l
         except Exception:
             pass
+    
+    # 如果结果仍然很长，再尝试一次激进化简
+    if best_len > 50:
+        try:
+            aggressive = simplify(best, ratio=2)
+            if len(_safe_latex(aggressive)) < best_len:
+                best = aggressive
+        except Exception:
+            pass
+    
     return best
 
 
