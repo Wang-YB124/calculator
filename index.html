@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>微积分计算器 | Calculus Calculator</title>
+  <link rel="icon" type="image/jpeg" href="images/favicon.jpg">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/algebrite@1.4.0/dist/algebrite.bundle-for-browser.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-content">
+        <h1>微积分计算器</h1>
+        <span class="backend-status" id="backendStatus" title="SymPy 后端状态">检测中...</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="input-section">
+        <div class="mode-tabs">
+          <button class="tab active" data-mode="derivative">
+            <span class="tab-icon">d/dx</span>
+            <span class="tab-label">求导</span>
+          </button>
+          <button class="tab" data-mode="integral">
+            <span class="tab-icon">\int</span>
+            <span class="tab-label">积分</span>
+          </button>
+          <button class="tab" data-mode="limit">
+            <span class="tab-icon">lim</span>
+            <span class="tab-label">极限</span>
+          </button>
+          <button class="tab" data-mode="series">
+            <span class="tab-icon">Σ</span>
+            <span class="tab-label">级数</span>
+          </button>
+          <button class="tab" data-mode="solve">
+            <span class="tab-icon">=</span>
+            <span class="tab-label">方程</span>
+          </button>
+        </div>
+
+        <div class="input-area">
+          <div class="input-row">
+            <label class="input-label" id="fnLabel">f(x) =</label>
+            <input type="text" id="fnInput" class="fn-input" placeholder="例如: x^3 + 2*x^2 - 5*x + 1" autocomplete="off">
+          </div>
+
+          <div class="symbol-panel">
+            <div class="symbol-tabs">
+              <button class="symbol-tab active" data-panel="basic">基础</button>
+              <button class="symbol-tab" data-panel="power">幂与根</button>
+              <button class="symbol-tab" data-panel="functions">函数</button>
+              <button class="symbol-tab" data-panel="calculus">数学符号</button>
+              <button class="symbol-tab" data-panel="common">常用式</button>
+            </div>
+            <div class="symbol-grid" id="symbolGrid"></div>
+            <div class="symbol-preview" id="symbolPreview">
+              <span class="preview-label">预览:</span>
+              <span class="preview-expr" id="previewExpr"></span>
+            </div>
+          </div>
+
+          <div class="options-row">
+            <div class="option-group" id="derivativeOptions">
+              <label>阶数:</label>
+              <select id="derivOrder">
+                <option value="1">一阶</option>
+                <option value="2">二阶</option>
+                <option value="3">三阶</option>
+              </select>
+            </div>
+            <div class="option-group hidden" id="integralOptions">
+              <label>类型:</label>
+              <select id="integralType">
+                <option value="indefinite">不定积分</option>
+                <option value="definite">定积分</option>
+              </select>
+              <div class="definite-options hidden" id="definiteOptions">
+                <label>从</label>
+                <input type="number" id="lowerBound" class="bound-input" placeholder="a" step="any">
+                <label>到</label>
+                <input type="number" id="upperBound" class="bound-input" placeholder="b" step="any">
+              </div>
+            </div>
+            <div class="option-group hidden" id="limitOptions">
+              <label>x →</label>
+              <input type="text" id="limitPoint" class="bound-input" placeholder="0" step="any" value="0">
+              <select id="limitDirection">
+                <option value="both">双侧</option>
+                <option value="left">左极限</option>
+                <option value="right">右极限</option>
+              </select>
+            </div>
+            <div class="option-group hidden" id="seriesOptions">
+              <label>展开点:</label>
+              <input type="text" id="seriesPoint" class="bound-input" placeholder="0" value="0">
+              <label>阶数:</label>
+              <select id="seriesOrder">
+                <option value="3">3阶</option>
+                <option value="5" selected>5阶</option>
+                <option value="7">7阶</option>
+                <option value="9">9阶</option>
+                <option value="11">11阶</option>
+              </select>
+            </div>
+            <div class="option-group hidden" id="solveOptions">
+              <label>f(x) =</label>
+              <input type="text" id="solveTarget" class="bound-input" placeholder="0" value="0">
+              <label>方法:</label>
+              <select id="solveMethod">
+                <option value="symbolic">符号求解</option>
+                <option value="numerical">数值求解</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="btn-calculate" id="calcBtn">计算</button>
+            <button class="btn-clear" id="clearBtn">清除</button>
+          </div>
+
+          <div class="examples">
+            <span class="examples-label">示例:</span>
+            <button class="example-btn" data-fn="x^3 + 2*x^2 - 5*x + 1">多项式</button>
+            <button class="example-btn" data-fn="sin(x)">三角函数</button>
+            <button class="example-btn" data-fn="e^x">指数函数</button>
+            <button class="example-btn" data-fn="ln(x)">对数函数</button>
+            <button class="example-btn" data-fn="x^2 * sin(x)">乘积</button>
+            <button class="example-btn" data-fn="sin(x^2)">复合函数</button>
+            <button class="example-btn" data-fn="1/x">分式</button>
+            <button class="example-btn" data-fn="sqrt(x)">根式</button>
+          </div>
+
+          <div class="formula-params hidden" id="formulaParams">
+            <h3 class="params-title" id="paramsTitle">公式参数设置</h3>
+            <div class="params-grid" id="paramsGrid"></div>
+            <div class="params-result" id="paramsResult"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="results-section hidden" id="resultsSection">
+        <div class="result-card">
+          <h2 class="result-title">结果</h2>
+          <div class="result-formula" id="resultFormula"></div>
+          <div class="result-value hidden" id="resultValue"></div>
+        </div>
+
+        <div class="result-card">
+          <h2 class="result-title">计算步骤</h2>
+          <div class="steps-container" id="stepsContainer"></div>
+        </div>
+
+        <div class="result-card">
+          <h2 class="result-title">函数图像</h2>
+          <div class="graph-controls">
+            <div class="range-group">
+              <label>x 范围:</label>
+              <input type="number" id="xMin" class="range-input" value="-10" step="any">
+              <span>到</span>
+              <input type="number" id="xMax" class="range-input" value="10" step="any">
+              <button class="btn-zoom" id="zoomOutBtn" title="缩小">−</button>
+              <button class="btn-zoom" id="zoomInBtn" title="放大">+</button>
+              <button class="btn-reset" id="resetViewBtn" title="重置视图">⟲</button>
+            </div>
+            <div class="graph-toggles">
+              <label class="toggle-label">
+                <input type="checkbox" id="showOriginal" checked>
+                <span class="color-dot original"></span> 原函数
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="showResult" checked>
+                <span class="color-dot result"></span> <span id="resultLegend">导函数</span>
+              </label>
+              <label class="toggle-label">
+                <input type="checkbox" id="showSpecialPoints" checked>
+                <span class="color-dot special"></span> 特殊点
+              </label>
+            </div>
+          </div>
+          <div class="graph-container" id="graphContainer">
+            <canvas id="graphCanvas"></canvas>
+            <div class="graph-tooltip hidden" id="graphTooltip">
+              <span class="tooltip-x" id="tooltipX"></span>
+              <span class="tooltip-y" id="tooltipY"></span>
+            </div>
+          </div>
+          <div class="graph-info" id="graphInfo"></div>
+          <div class="special-points-panel" id="specialPointsPanel"></div>
+        </div>
+
+        <div class="result-card" id="formulaCard">
+          <h2 class="result-title">相关公式</h2>
+          <div class="formulas-list" id="formulasList"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>微积分计算器 — 支持求导、积分、图像可视化</p>
+    </footer>
+  </div>
+
+  <div class="error-toast hidden" id="errorToast">
+    <span id="errorMsg"></span>
+    <button class="toast-close" id="toastClose">&times;</button>
+  </div>
+
+  <script src="js/app_complete.js?v=21"></script>
+</body>
+</html>
