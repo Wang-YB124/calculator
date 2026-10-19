@@ -147,6 +147,7 @@ def _safe_latex(expr):
         # SymPy 的 log 是自然对数，显示为 ln
         import re
         result = re.sub(r'\\log(?![_{])', r'\\ln', result)
+        result = result.replace(r'\log{', r'\ln{')
         return result
     except Exception:
         return str(expr)
