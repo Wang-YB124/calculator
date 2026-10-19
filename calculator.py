@@ -507,19 +507,25 @@ def _show_integration_by_parts_steps(steps, expr, result, var, var_name):
     du = diff(u, var)
     v = integrate(dv, var)
     
-    steps.append("使用分部积分法：$\\int u \\, dv = uv - \\int v \\, du$")
-    steps.append(f"设 $u = {_safe_latex(u)}$，$dv = {_safe_latex(dv)} \\, d{var_name}$")
-    steps.append(f"则 $du = {_safe_latex(du)} \\, d{var_name}$，$v = {_safe_latex(v)}$")
-    steps.append(f"代入公式：$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(u)} \\cdot {_safe_latex(v)} - \\int {_safe_latex(v)} \\cdot {_safe_latex(du)} \\, d{var_name}$")
+    steps.append("使用分部积分法")
+    steps.append(f"$\\int u \\, dv = uv - \\int v \\, du$")
+    steps.append(f"选择 u 和 dv")
+    steps.append(f"$u = {_safe_latex(u)}$")
+    steps.append(f"$dv = {_safe_latex(dv)} \\, d{var_name}$")
+    steps.append(f"计算 du 和 v")
+    steps.append(f"$du = {_safe_latex(du)} \\, d{var_name}$")
+    steps.append(f"$v = {_safe_latex(v)}$")
+    steps.append(f"代入分部积分公式")
+    steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(u)} \\cdot {_safe_latex(v)} - \\int {_safe_latex(v)} \\cdot {_safe_latex(du)} \\, d{var_name}$")
     
     # 计算剩余积分
     remaining = integrate(v * du, var)
     if not remaining.has(Integral):
         steps.append(f"计算剩余积分：$\\int {_safe_latex(v)} \\cdot {_safe_latex(du)} \\, d{var_name} = {_safe_latex(_smart_simplify(remaining))}$")
         final_result = _smart_simplify(u * v - remaining)
-        steps.append(f"最终结果：$= {_safe_latex(final_result)} + C$")
+        steps.append(f"得到最终结果：$= {_safe_latex(final_result)} + C$")
     else:
-        steps.append(f"最终结果：$= {_safe_latex(result)} + C$")
+        steps.append(f"得到最终结果：$= {_safe_latex(result)} + C$")
 
 
 def _choose_u_dv_by_liate(expr, var):
@@ -577,11 +583,11 @@ def _show_substitution_steps(steps, expr, result, var, var_name):
         inner = expr.args[0] if expr.args else None
         if inner is not None and inner.has(var):
             steps.append("使用换元法")
-            steps.append(f"设 $u = {_safe_latex(inner)}$")
+            steps.append(f"设中间变量 u：$u = {_safe_latex(inner)}$")
             du = diff(inner, var)
-            steps.append(f"则 $du = {_safe_latex(du)} \\, d{var_name}$")
-            steps.append(f"原积分变为：$\\int {_safe_latex(expr.func)}(u) \\cdot \\frac{{1}}{{{_safe_latex(du)}}} \\, du$")
-            steps.append(f"计算得：$= {_safe_latex(result)} + C$")
+            steps.append(f"计算 du：$du = {_safe_latex(du)} \\, d{var_name}$")
+            steps.append(f"原积分变换为：$\\int {_safe_latex(expr.func)}(u) \\cdot \\frac{{1}}{{{_safe_latex(du)}}} \\, du$")
+            steps.append(f"计算得到结果：$= {_safe_latex(result)} + C$")
             return
     
     # 无法识别换元，直接显示结果
