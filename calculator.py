@@ -137,7 +137,14 @@ def parse_expression(expr_str, var_name='x'):
 def _safe_latex(expr):
     """安全生成 LaTeX，失败时返回原始字符串"""
     try:
-        return latex(expr)
+        result = latex(expr)
+        result = result.replace(r'\operatorname{asin}', r'\arcsin')
+        result = result.replace(r'\operatorname{acos}', r'\arccos')
+        result = result.replace(r'\operatorname{atan}', r'\arctan')
+        result = result.replace(r'\operatorname{asinh}', r'\operatorname{arsinh}')
+        result = result.replace(r'\operatorname{acosh}', r'\operatorname{arcosh}')
+        result = result.replace(r'\operatorname{atanh}', r'\operatorname{artanh}')
+        return result
     except Exception:
         return str(expr)
 
