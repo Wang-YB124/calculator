@@ -121,9 +121,6 @@ def _safe_latex(expr):
         result = result.replace(r'\operatorname{asin}', r'\arcsin')
         result = result.replace(r'\operatorname{acos}', r'\arccos')
         result = result.replace(r'\operatorname{atan}', r'\arctan')
-        result = result.replace(r'\operatorname{asinh}', r'\operatorname{arsinh}')
-        result = result.replace(r'\operatorname{acosh}', r'\operatorname{arcosh}')
-        result = result.replace(r'\operatorname{atanh}', r'\operatorname{artanh}')
         # SymPy 的 log 是自然对数，显示为 ln
         import re
         result = re.sub(r'\\log(?![_{])', r'\\ln', result)
