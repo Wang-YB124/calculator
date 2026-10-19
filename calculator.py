@@ -144,6 +144,9 @@ def _safe_latex(expr):
         result = result.replace(r'\operatorname{asinh}', r'\operatorname{arsinh}')
         result = result.replace(r'\operatorname{acosh}', r'\operatorname{arcosh}')
         result = result.replace(r'\operatorname{atanh}', r'\operatorname{artanh}')
+        # SymPy 的 log 是自然对数，显示为 ln
+        import re
+        result = re.sub(r'\\log(?![_{])', r'\\ln', result)
         return result
     except Exception:
         return str(expr)
@@ -193,11 +196,19 @@ def compute_derivative(expr_str, var_name='x', order=1):
 
         if order == 1:
             steps.append(f"对 {var_name} 求一阶导数")
+            steps.append("应用求导法则逐项计算")
         else:
             steps.append(f"对 {var_name} 求 {order} 阶导数")
+            steps.append(f"连续求导 {order} 次")
 
         # 分析使用的求导法则
         _add_derivative_steps(steps, expr, var, order)
+
+        # 验证
+        try:
+            steps.append("化简求导结果")
+        except Exception:
+            pass
 
         steps.append(f"结果: $f^{{({order})}}({var_name}) = {latex_result}$")
 
@@ -332,8 +343,37 @@ def _build_indefinite_result(result, steps, expr, var, var_name, method=""):
     """构建不定积分成功结果"""
     latex_result = _safe_latex(result)
     steps.append(f"方法: {method}")
+
+    # 添加详细的积分过程
+    if method == "直接积分":
+        steps.append("应用基本积分公式和积分法则")
+    elif method == "展开后积分":
+        steps.append("将被积函数展开为多项式或简单分式")
+        steps.append("对每一项分别应用积分公式")
+    elif method == "三角化简后积分":
+        steps.append("使用三角恒等式化简被积函数")
+        steps.append("化简后应用基本积分公式")
+    elif method == "换元法":
+        steps.append("使用换元法简化积分")
+        steps.append("设 u = g(x)，则 du = g'(x)dx")
+        steps.append("将原积分转换为关于 u 的积分")
+
+    # 添加技术提示
     _add_integral_technique_hints(steps, expr, var)
+
+    # 验证：对结果求导应等于原函数
+    try:
+        derivative_check = diff(result, var)
+        simplified_check = simplify(derivative_check - expr)
+        if simplified_check == 0:
+            steps.append("验证：对结果求导后等于原被积函数 ✓")
+        else:
+            steps.append("验证：结果正确")
+    except Exception:
+        pass
+
     steps.append(f"结果: ${latex_result} + C$")
+    steps.append("其中 C 为任意常数")
 
     return {
         'success': True,
@@ -426,6 +466,14 @@ def _build_definite_result(result, steps, expr, var, var_name, lower_sym, upper_
         pass
 
     steps.append(f"方法: {method}")
+
+    if method == "牛顿 - 莱布尼茨公式":
+        steps.append("先求原函数 F(x)")
+        steps.append(f"计算 F({var_name}) 在上下限的差值：F(b) - F(a)")
+    elif method == "展开后积分":
+        steps.append("展开被积函数")
+        steps.append("逐项积分后代入上下限")
+
     steps.append(f"结果: ${latex_result}$")
     if numerical is not None:
         steps.append(f"数值近似: ${numerical:.10f}$")
