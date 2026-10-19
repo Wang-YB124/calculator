@@ -391,14 +391,12 @@ def _compute_indefinite_integral(expr, var, var_name):
 
 
 def _build_indefinite_result(result, steps, expr, var, var_name, method=""):
-    """构建不定积分成功结果 - 直接积分法"""
+    """构建不定积分成功结果 - 显示详细步骤"""
     latex_result = _safe_latex(result)
     steps.append(f"方法：{method}")
-    steps.append(f"应用基本积分公式和积分法则")
-    steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {latex_result} + C$")
 
-    # 添加技术提示
-    _add_integral_technique_hints(steps, expr, var)
+    # 根据表达式类型生成详细步骤
+    _generate_detailed_integration_steps(steps, expr, result, var, var_name)
 
     # 验证：对结果求导应等于原函数
     try:
@@ -421,6 +419,104 @@ def _build_indefinite_result(result, steps, expr, var, var_name, method=""):
         'expression': str(result),
         'definite': False
     }
+
+
+def _generate_detailed_integration_steps(steps, expr, result, var, var_name):
+    """根据表达式类型生成详细的积分步骤"""
+    # 如果是加法，逐项积分
+    if expr.is_Add:
+        terms = expr.as_ordered_terms()
+        steps.append("应用加法法则：逐项分别积分")
+        steps.append(f"$\\int ({_safe_latex(expr)}) \\, d{var_name} = " +
+                     " + ".join([f"\\int {_safe_latex(t)} \\, d{var_name}" for t in terms]) + "$")
+
+        # 对每一项显示积分过程
+        for term in terms:
+            _integrate_single_term(steps, term, var, var_name)
+
+        steps.append("合并结果:")
+        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+    # 如果是单项式，直接应用公式
+    elif expr.is_Mul or expr.is_Pow or expr.is_Symbol or expr.is_Number:
+        _integrate_single_term(steps, expr, var, var_name)
+        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+    # 如果是函数，显示对应的积分公式
+    elif expr.is_Function:
+        func_name = type(expr).__name__
+        _show_function_integration_rule(steps, func_name, expr, result, var, var_name)
+        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+    else:
+        steps.append("应用积分公式和积分法则")
+        steps.append(f"$\\int {_safe_latex(expr)} \\, d{var_name} = {_safe_latex(result)} + C$")
+
+
+def _integrate_single_term(steps, term, var, var_name):
+    """显示单项的积分过程"""
+    # 常数倍
+    if term.is_Mul:
+        coeff = term.as_coeff_Mul()[0]
+        rest = term.as_coeff_Mul()[1]
+        if coeff != 1 and rest.has(var):
+            steps.append(f"提取常数: $\\int {_safe_latex(term)} \\, d{var_name} = {_safe_latex(coeff)} \\int {_safe_latex(rest)} \\, d{var_name}$")
+            term = rest
+
+    # 幂函数 x^n
+    if term.is_Pow and term.base == var:
+        n = term.exp
+        if n != -1:
+            steps.append(f"应用幂函数积分公式: $\\int x^n dx = \\frac{{x^{{n+1}}}}{{n+1}} + C$ (n ≠ -1)")
+            steps.append(f"其中 n = {_safe_latex(n)}")
+            result_term = integrate(term, var)
+            steps.append(f"$\\int {_safe_latex(term)} \\, d{var_name} = {_safe_latex(result_term)}$")
+        else:
+            steps.append(f"应用对数积分公式: $\\int x^{{-1}} dx = \\ln|x| + C$")
+            steps.append(f"$\\int {_safe_latex(term)} \\, d{var_name} = \\ln|{_safe_latex(var)}|$")
+
+    # 符号 x (即 x^1)
+    elif term == var:
+        steps.append(f"应用幂函数积分公式: $\\int x dx = \\frac{{x^2}}{2} + C$")
+        steps.append(f"$\\int {_safe_latex(term)} \\, d{var_name} = \\frac{{{_safe_latex(var)}^2}}{2}$")
+
+    # 常数
+    elif term.is_Number and not term.has(var):
+        steps.append(f"常数积分: $\\int {_safe_latex(term)} \\, d{var_name} = {_safe_latex(term)}{_safe_latex(var)}$")
+
+    # 其他情况，直接显示结果
+    else:
+        result_term = integrate(term, var)
+        if result_term.has(Integral):
+            steps.append(f"$\\int {_safe_latex(term)} \\, d{var_name}$ (需要进一步化简)")
+        else:
+            steps.append(f"$\\int {_safe_latex(term)} \\, d{var_name} = {_safe_latex(result_term)}$")
+
+
+def _show_function_integration_rule(steps, func_name, expr, result, var, var_name):
+    """显示函数积分公式"""
+    rules = {
+        'sin': ("$\\int \\sin(x) dx = -\\cos(x) + C$", "$\\int \\sin(u) du = -\\cos(u) + C$"),
+        'cos': ("$\\int \\cos(x) dx = \\sin(x) + C$", "$\\int \\cos(u) du = \\sin(u) + C$"),
+        'tan': ("$\\int \\tan(x) dx = -\\ln|\\cos(x)| + C$", None),
+        'exp': ("$\\int e^x dx = e^x + C$", "$\\int e^u du = e^u + C$"),
+        'log': ("$\\int \\ln(x) dx = x\\ln(x) - x + C$", None),
+        'asin': ("$\\int \\arcsin(x) dx = x\\arcsin(x) + \\sqrt{1-x^2} + C$", None),
+        'acos': ("$\\int \\arccos(x) dx = x\\arccos(x) - \\sqrt{1-x^2} + C$", None),
+        'atan': ("$\\int \\arctan(x) dx = x\\arctan(x) - \\frac{1}{2}\\ln(1+x^2) + C$", None),
+    }
+
+    if func_name in rules:
+        simple_rule, chain_rule = rules[func_name]
+        arg = expr.args[0] if expr.args else var
+
+        if arg == var:
+            steps.append(f"应用积分公式：{simple_rule}")
+        else:
+            steps.append(f"应用积分公式：{simple_rule}")
+            if chain_rule:
+                steps.append(f"链式法则：{chain_rule}")
+            steps.append(f"其中 u = {_safe_latex(arg)}")
 
 
 def _build_expansion_steps(result, steps, expr, expanded, var, var_name):
