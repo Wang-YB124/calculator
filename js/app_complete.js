@@ -1160,7 +1160,29 @@
         dom.resultValue.textContent = '请尝试简化表达式或使用其他计算方式';
         dom.resultValue.classList.remove('hidden');
       }
+      // 仍然显示后端返回的步骤（包含建议）
       dom.stepsContainer.innerHTML = '';
+      if (data.steps && data.steps.length > 0) {
+        data.steps.forEach((step, i) => {
+          const stepEl = document.createElement('div');
+          stepEl.className = 'step';
+          stepEl.innerHTML = `
+            <div class="step-number">${i + 1}</div>
+            <div class="step-content">
+              <div class="step-description">${step.desc}</div>
+              <div class="step-explanation">${step.explanation || ''}</div>
+              <div class="step-formula"></div>
+            </div>
+          `;
+          
+          const formulaEl = stepEl.querySelector('.step-formula');
+          if (step.latex) {
+            renderKatex(formulaEl, step.latex, false);
+          }
+          
+          dom.stepsContainer.appendChild(stepEl);
+        });
+      }
       displayRelatedFormulas(data.mode);
       return;
     }
