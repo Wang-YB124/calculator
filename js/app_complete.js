@@ -102,7 +102,7 @@
     result = result.replace(/sec\(/g, '\\sec(');
     result = result.replace(/csc\(/g, '\\csc(');
     result = result.replace(/ln\(/g, '\\ln(');
-    result = result.replace(/log\(/g, '\\log(');
+    result = result.replace(/log\(/g, '\\ln(');
     result = result.replace(/abs\(/g, '|');
     
     // 处理常量和特殊值
@@ -207,8 +207,11 @@
     jsExpr = jsExpr.replace(/\barcsin\(/g, 'Math.asin(');
     jsExpr = jsExpr.replace(/\barccos\(/g, 'Math.acos(');
     jsExpr = jsExpr.replace(/\barctan\(/g, 'Math.atan(');
+    jsExpr = jsExpr.replace(/\basinh\(/g, 'Math.asinh(');
+    jsExpr = jsExpr.replace(/\bacosh\(/g, 'Math.acosh(');
+    jsExpr = jsExpr.replace(/\batanh\(/g, 'Math.atanh(');
     jsExpr = jsExpr.replace(/\bln\(/g, 'Math.log(');
-    jsExpr = jsExpr.replace(/\blog\(/g, 'Math.log10(');
+    jsExpr = jsExpr.replace(/\blog\(/g, 'Math.log(');
     jsExpr = jsExpr.replace(/\bsqrt\(/g, 'Math.sqrt(');
     jsExpr = jsExpr.replace(/\babs\(/g, 'Math.abs(');
     jsExpr = jsExpr.replace(/\bexp\(/g, 'Math.exp(');
