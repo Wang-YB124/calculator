@@ -198,34 +198,20 @@
   function createEvalFunction(expr) {
     if (!expr || typeof expr !== 'string') return null;
     let jsExpr = expr;
-    // 转换数学函数为JavaScript函数（先转长名，避免 arctan 被误转）
-    jsExpr = jsExpr.replace(/\barctan\(/g, 'Math.atan(');
-    jsExpr = jsExpr.replace(/\barcsin\(/g, 'Math.asin(');
-    jsExpr = jsExpr.replace(/\barccos\(/g, 'Math.acos(');
-    // SymPy 风格函数名（后端 expression 字段）
-    jsExpr = jsExpr.replace(/\batan\(/g, 'Math.atan(');
-    jsExpr = jsExpr.replace(/\basin\(/g, 'Math.asin(');
-    jsExpr = jsExpr.replace(/\bacos\(/g, 'Math.acos(');
-    jsExpr = jsExpr.replace(/\basinh\(/g, 'Math.asinh(');
-    jsExpr = jsExpr.replace(/\bacosh\(/g, 'Math.acosh(');
-    jsExpr = jsExpr.replace(/\batanh\(/g, 'Math.atanh(');
-    jsExpr = jsExpr.replace(/\bsin\(/g, 'Math.sin(');
-    jsExpr = jsExpr.replace(/\bcos\(/g, 'Math.cos(');
-    jsExpr = jsExpr.replace(/\btan\(/g, 'Math.tan(');
-    jsExpr = jsExpr.replace(/\bcot\(/g, '(1/Math.tan(');
-    jsExpr = jsExpr.replace(/\bsec\(/g, '(1/Math.cos(');
-    jsExpr = jsExpr.replace(/\bcsc\(/g, '(1/Math.sin(');
-    jsExpr = jsExpr.replace(/\bsinh\(/g, 'Math.sinh(');
-    jsExpr = jsExpr.replace(/\bcosh\(/g, 'Math.cosh(');
-    jsExpr = jsExpr.replace(/\btanh\(/g, 'Math.tanh(');
-    jsExpr = jsExpr.replace(/\bln\(/g, 'Math.log(');
-    jsExpr = jsExpr.replace(/\blog\(/g, 'Math.log(');
-    jsExpr = jsExpr.replace(/\bsqrt\(/g, 'Math.sqrt(');
-    jsExpr = jsExpr.replace(/\bAbs\(/g, 'Math.abs(');
-    jsExpr = jsExpr.replace(/\babs\(/g, 'Math.abs(');
-    jsExpr = jsExpr.replace(/\bexp\(/g, 'Math.exp(');
-    jsExpr = jsExpr.replace(/\bfloor\(/g, 'Math.floor(');
-    jsExpr = jsExpr.replace(/\bceil\(/g, 'Math.ceil(');
+    // 单遍替换所有函数名，避免二次转换（如 ln→Math.log 后被 log 规则再次匹配）
+    const fnMap = {
+      arctan: 'Math.atan', arcsin: 'Math.asin', arccos: 'Math.acos',
+      asinh: 'Math.asinh', acosh: 'Math.acosh', atanh: 'Math.atanh',
+      atan: 'Math.atan', asin: 'Math.asin', acos: 'Math.acos',
+      sinh: 'Math.sinh', cosh: 'Math.cosh', tanh: 'Math.tanh',
+      sin: 'Math.sin', cos: 'Math.cos', tan: 'Math.tan',
+      cot: '(1/Math.tan', sec: '(1/Math.cos', csc: '(1/Math.sin',
+      ln: 'Math.log', log: 'Math.log', sqrt: 'Math.sqrt',
+      Abs: 'Math.abs', abs: 'Math.abs', exp: 'Math.exp',
+      floor: 'Math.floor', ceil: 'Math.ceil'
+    };
+    jsExpr = jsExpr.replace(/\b(arctan|arcsin|arccos|asinh|acosh|atanh|atan|asin|acos|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|ln|log|sqrt|Abs|abs|exp|floor|ceil)\(/g,
+      (m, name) => fnMap[name] + '(');
     // 转换常量
     jsExpr = jsExpr.replace(/π/g, 'Math.PI');
     jsExpr = jsExpr.replace(/\bpi\b/g, 'Math.PI');
