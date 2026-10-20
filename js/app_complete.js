@@ -1524,6 +1524,7 @@
     const resultFn = resultExpr ? createEvalFunction(resultExpr) : null;
     
     let yMin = Infinity, yMax = -Infinity;
+    const finiteYs = [];
     
     for (let i = 0; i <= samples; i++) {
       const x = xMin + (i / samples) * (xMax - xMin);
@@ -1534,8 +1535,7 @@
       }
       origSamples.push({ x, y: yOrig });
       if (isFinite(yOrig) && Math.abs(yOrig) < 1e6) {
-        yMin = Math.min(yMin, yOrig);
-        yMax = Math.max(yMax, yOrig);
+        finiteYs.push(yOrig);
       }
       
       if (resultFn) {
@@ -1543,13 +1543,21 @@
         try { yResult = resultFn(x); } catch (e) {}
         resultSamples.push({ x, y: yResult });
         if (isFinite(yResult) && Math.abs(yResult) < 1e6) {
-          yMin = Math.min(yMin, yResult);
-          yMax = Math.max(yMax, yResult);
+          finiteYs.push(yResult);
         }
       }
     }
     
-    // 添加边距
+    // 用分位数确定Y轴范围，避免tan等函数渐近线附近的极端值压扁其他曲线
+    if (finiteYs.length > 20) {
+      finiteYs.sort((a, b) => a - b);
+      yMin = finiteYs[Math.floor(finiteYs.length * 0.02)];
+      yMax = finiteYs[Math.floor(finiteYs.length * 0.98)];
+      if (yMax - yMin < 1e-9) {
+        yMin = finiteYs[0];
+        yMax = finiteYs[finiteYs.length - 1];
+      }
+    }
     if (yMin === Infinity) { yMin = -10; yMax = 10; }
     const yRange = yMax - yMin || 1;
     yMin -= yRange * 0.1;
@@ -1622,14 +1630,14 @@
     if (dom.showOriginal && dom.showOriginal.checked) {
       ctx.strokeStyle = '#06b6d4';
       ctx.lineWidth = 2;
-      drawCurve(ctx, origSamples, toCanvasX, toCanvasY, height);
+      drawCurve(ctx, origSamples, toCanvasX, toCanvasY, yMin, yMax);
     }
     
     // 绘制结果函数
     if (resultExpr && dom.showResult && dom.showResult.checked) {
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 2;
-      drawCurve(ctx, resultSamples, toCanvasX, toCanvasY, height);
+      drawCurve(ctx, resultSamples, toCanvasX, toCanvasY, yMin, yMax);
     }
     
     // 绘制特殊点
@@ -1638,22 +1646,25 @@
     }
   }
   
-  function drawCurve(ctx, samples, toCanvasX, toCanvasY, height) {
+  function drawCurve(ctx, samples, toCanvasX, toCanvasY, viewYMin, viewYMax) {
     ctx.beginPath();
     let drawing = false;
+    let prevY = NaN;
+    const viewSpan = viewYMax - viewYMin;
     for (let i = 0; i < samples.length; i++) {
       const { x, y } = samples[i];
       if (!isFinite(y)) {
         drawing = false;
+        prevY = NaN;
         continue;
       }
+      // 渐近线跳跃：相邻两点符号相反且跨越整个视野时断开，避免画出竖直连线
+      if (drawing && isFinite(prevY) && y * prevY < 0 && Math.abs(y - prevY) > viewSpan) {
+        drawing = false;
+      }
+      prevY = y;
       const cx = toCanvasX(x);
       const cy = toCanvasY(y);
-      // 只在y值极大（渐近线）时断开
-      if (Math.abs(y) > 1e6) {
-        drawing = false;
-        continue;
-      }
       if (!drawing) {
         ctx.moveTo(cx, cy);
         drawing = true;
