@@ -196,28 +196,43 @@
 
   // 将表达式转换为JavaScript可执行的函数
   function createEvalFunction(expr) {
+    if (!expr || typeof expr !== 'string') return null;
     let jsExpr = expr;
-    // 转换数学函数为JavaScript函数
+    // 转换数学函数为JavaScript函数（先转长名，避免 arctan 被误转）
+    jsExpr = jsExpr.replace(/\barctan\(/g, 'Math.atan(');
+    jsExpr = jsExpr.replace(/\barcsin\(/g, 'Math.asin(');
+    jsExpr = jsExpr.replace(/\barccos\(/g, 'Math.acos(');
+    // SymPy 风格函数名（后端 expression 字段）
+    jsExpr = jsExpr.replace(/\batan\(/g, 'Math.atan(');
+    jsExpr = jsExpr.replace(/\basin\(/g, 'Math.asin(');
+    jsExpr = jsExpr.replace(/\bacos\(/g, 'Math.acos(');
+    jsExpr = jsExpr.replace(/\basinh\(/g, 'Math.asinh(');
+    jsExpr = jsExpr.replace(/\bacosh\(/g, 'Math.acosh(');
+    jsExpr = jsExpr.replace(/\batanh\(/g, 'Math.atanh(');
     jsExpr = jsExpr.replace(/\bsin\(/g, 'Math.sin(');
     jsExpr = jsExpr.replace(/\bcos\(/g, 'Math.cos(');
     jsExpr = jsExpr.replace(/\btan\(/g, 'Math.tan(');
     jsExpr = jsExpr.replace(/\bcot\(/g, '(1/Math.tan(');
     jsExpr = jsExpr.replace(/\bsec\(/g, '(1/Math.cos(');
     jsExpr = jsExpr.replace(/\bcsc\(/g, '(1/Math.sin(');
-    jsExpr = jsExpr.replace(/\barcsin\(/g, 'Math.asin(');
-    jsExpr = jsExpr.replace(/\barccos\(/g, 'Math.acos(');
-    jsExpr = jsExpr.replace(/\barctan\(/g, 'Math.atan(');
-    jsExpr = jsExpr.replace(/\basinh\(/g, 'Math.asinh(');
-    jsExpr = jsExpr.replace(/\bacosh\(/g, 'Math.acosh(');
-    jsExpr = jsExpr.replace(/\batanh\(/g, 'Math.atanh(');
+    jsExpr = jsExpr.replace(/\bsinh\(/g, 'Math.sinh(');
+    jsExpr = jsExpr.replace(/\bcosh\(/g, 'Math.cosh(');
+    jsExpr = jsExpr.replace(/\btanh\(/g, 'Math.tanh(');
     jsExpr = jsExpr.replace(/\bln\(/g, 'Math.log(');
     jsExpr = jsExpr.replace(/\blog\(/g, 'Math.log(');
     jsExpr = jsExpr.replace(/\bsqrt\(/g, 'Math.sqrt(');
+    jsExpr = jsExpr.replace(/\bAbs\(/g, 'Math.abs(');
     jsExpr = jsExpr.replace(/\babs\(/g, 'Math.abs(');
     jsExpr = jsExpr.replace(/\bexp\(/g, 'Math.exp(');
+    jsExpr = jsExpr.replace(/\bfloor\(/g, 'Math.floor(');
+    jsExpr = jsExpr.replace(/\bceil\(/g, 'Math.ceil(');
     // 转换常量
+    jsExpr = jsExpr.replace(/π/g, 'Math.PI');
     jsExpr = jsExpr.replace(/\bpi\b/g, 'Math.PI');
+    jsExpr = jsExpr.replace(/\bE\b/g, 'Math.E');
     jsExpr = jsExpr.replace(/\be\b/g, 'Math.E');
+    jsExpr = jsExpr.replace(/\bInfinity\b/g, 'Infinity');
+    jsExpr = jsExpr.replace(/\binf\b/g, 'Infinity');
     // 转换幂运算
     jsExpr = jsExpr.replace(/\^/g, '**');
     
@@ -1508,10 +1523,14 @@
     
     // 获取结果函数的表达式
     let resultExpr = null;
-    if (lastResult.mode === 'derivative') {
+    if (lastResult.mode === 'derivative' || lastResult.mode === 'integral' || lastResult.mode === 'series') {
       resultExpr = lastResult.graphExpr || (lastResult.isBackendLatex ? null : lastResult.result);
-    } else if (lastResult.mode === 'integral') {
-      resultExpr = lastResult.graphExpr || (lastResult.isBackendLatex ? null : lastResult.result);
+    }
+    
+    // 定积分结果是常数，画出来没有意义，跳过
+    if (resultExpr) {
+      const stripped = resultExpr.replace(/exp|sqrt|abs|floor|ceil|asinh|acosh|atanh|arcsin|arccos|arctan|asin|acos|atan|sinh|cosh|tanh|sin|cos|tan|log|ln|pi/gi, '');
+      if (!stripped.includes('x')) resultExpr = null;
     }
     
     // 预编译计算函数（避免每次采样都重新创建）
